@@ -1,19 +1,24 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>replit</title>
+    <link href="style.css" rel="stylesheet" type="text/css" />
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"
+      integrity="sha512-zhHQR0/H5SEBL3Wn6yYSaTTZej12z0hVZKOv3TwCUXT1z5qeqGcXJLLrbERYRScEDDpYIJhPC1fk31gqR783iQ=="
+      crossorigin="anonymous"
+      defer
+    ></script>
+    <script src="script.js" type="module"></script>
+  </head>
 
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width">
-  <title>replit</title>
-  <link href="style.css" rel="stylesheet" type="text/css" />
-</head>
-
-<body>
-  Hello world
-  <script src="script.js"></script>
-  <button onclick="button()">button</button>
-  <button onclick="button2()">button two</button>
-  <iframe src="https://www.google.com" height="900" width="1600"</iframe>
-</body>
-
+  <body>
+    Hello world
+    <button onclick="button()">button</button>
+    <button onclick="button2()">button two</button>
+    <br />
+    <canvas id="canvas" width="640" height="480"></canvas>
+  </body>
 </html>
