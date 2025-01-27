@@ -45,7 +45,7 @@ function makeWorker(workerfunc, receivefunc, workername) {
   URL.revokeObjectURL(blobURL);
 }
 
-let squareRotation = 0.0;
+let cubeRotation = 0.0;
 let deltaTime = 0;
 
 function main() {
@@ -179,8 +179,8 @@ https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Adding_2D_co
     deltaTime = now - then;
     then = now;
 
-    drawScene(gl, programInfo, buffers, squareRotation);
-    squareRotation += deltaTime;
+    drawScene(gl, programInfo, buffers, cubeRotation);
+    cubeRotation += deltaTime;
 
     requestAnimationFrame(render);
   }
