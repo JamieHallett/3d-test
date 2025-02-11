@@ -1,4 +1,11 @@
-function drawScene(gl, programInfo, buffers, cubeRotation) {
+function drawScene(
+  gl,
+  programInfo,
+  buffers,
+  cameraRot = [0.0, 0.0],
+  cameraPos = [0.0, 0.0, -3.0],
+  bufferArray,
+) {
   gl.clearColor(0.0, 0.0, 0.0, 1.0); // Clear to black, fully opaque
   gl.clearDepth(1.0); // Clear everything
   gl.enable(gl.DEPTH_TEST); // Enable depth testing
@@ -10,12 +17,12 @@ function drawScene(gl, programInfo, buffers, cubeRotation) {
 
   // Create a perspective matrix, a special matrix that is
   // used to simulate the distortion of perspective in a camera.
-  // Our field of view is 45 degrees, with a width/height
+  // Our field of view is 90 degrees, with a width/height
   // ratio that matches the display size of the canvas
   // and we only want to see objects between 0.1 units
   // and 100 units away from the camera.
 
-  const fieldOfView = (45 * Math.PI) / 180; // in radians
+  const fieldOfView = (90 * Math.PI) / 180; // in radians
   const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
   const zNear = 0.1;
   const zFar = 100.0;
@@ -29,33 +36,49 @@ function drawScene(gl, programInfo, buffers, cubeRotation) {
   // the center of the scene.
   const modelViewMatrix = mat4.create();
 
+  
   // Now move the drawing position a bit to where we want to
-  // start drawing the square.
-  mat4.translate(
-    modelViewMatrix, // destination matrix
-    modelViewMatrix, // matrix to translate
-    [-0.0, 0.0, -6.0],
-  ); // amount to translate
-
+  // start drawing the cubes.
   mat4.rotate(
     modelViewMatrix, // destination matrix
     modelViewMatrix, // matrix to rotate
-    cubeRotation, // amount to rotate in radians
+    cameraRot[1], // amount to rotate in radians
     [0, 0, 1],
   ); // axis to rotate around (Z)
   mat4.rotate(
     modelViewMatrix, // destination matrix
     modelViewMatrix, // matrix to rotate
-    cubeRotation * 0.7, // amount to rotate in radians
+    cameraRot[0], // amount to rotate in radians
     [0, 1, 0],
   ); // axis to rotate around (Y)
+  /*
   mat4.rotate(
     modelViewMatrix, // destination matrix
     modelViewMatrix, // matrix to rotate
-    cubeRotation * 0.3, // amount to rotate in radians
+    cameraRot[1], // amount to rotate in radians
     [1, 0, 0],
   ); // axis to rotate around (X)
+  */
+  mat4.translate(
+    modelViewMatrix, // destination matrix
+    modelViewMatrix, // matrix to translate
+    cameraPos,
+  ); // amount to translate
 
+  // draw the elements
+  const len = bufferArray.length;
+  for (let i = 0; i < len; i++) {
+    drawElem(
+      gl,
+      programInfo,
+      bufferArray[i],
+      projectionMatrix,
+      modelViewMatrix,
+    );
+  }
+}
+
+function drawElem(gl, programInfo, buffers, projectionMatrix, modelViewMatrix) {
   // Tell WebGL how to pull out the positions from the position
   // buffer into the vertexPosition attribute.
   setPositionAttribute(gl, buffers, programInfo);
@@ -64,7 +87,7 @@ function drawScene(gl, programInfo, buffers, cubeRotation) {
 
   // Tell WebGL which indices to use to index the vertices
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.indices);
-  
+
   // Tell WebGL to use our program when drawing
   gl.useProgram(programInfo.program);
 
@@ -86,7 +109,6 @@ function drawScene(gl, programInfo, buffers, cubeRotation) {
     const offset = 0;
     gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
   }
-
 }
 
 // Tell WebGL how to pull out the positions from the position

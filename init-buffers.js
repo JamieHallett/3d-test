@@ -1,5 +1,5 @@
-function initBuffers(gl) {
-  const positionBuffer = initPositionBuffer(gl);
+function initBuffers(gl, positionList) {
+  const positionBuffer = initPositionBuffer(gl, positionList);
 
   const colorBuffer = initColorBuffer(gl);
 
@@ -12,7 +12,25 @@ function initBuffers(gl) {
   };
 }
 
-function initPositionBuffer(gl) {
+function initManyCubeBuffers(
+  gl,
+  numCubes,
+  objs = [{ X: 0, Y: 0, Z: 0, size: 2 }],
+) {
+  const buffers = [];
+  const colorBuffer = initColorBuffer(gl);
+  const indexBuffer = initIndexBuffer(gl);
+  for (let i = 0; i < numCubes; i++) {
+    buffers.push({
+      position: initPositionBuffer(gl, buildPositionsCube(objs[i])),
+      color: colorBuffer,
+      indices: indexBuffer,
+    });
+  }
+  return buffers;
+}
+
+function initPositionBuffer(gl, positionList) {
   // Create a buffer for the square's positions.
   const positionBuffer = gl.createBuffer();
 
@@ -21,7 +39,7 @@ function initPositionBuffer(gl) {
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 
   // Now create an array of positions for the square.
-  const positions = [
+  const positions = positionList || [
     // Front face
     -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0,
 
@@ -134,4 +152,56 @@ function initIndexBuffer(gl) {
   return indexBuffer;
 }
 
-export { initBuffers };
+function buildPositionsCube(obj = { X: 0, Y: 0, Z: 0, size: 2 }) {
+  const { X, Y, Z, size } = obj;
+  const radius = size / 2;
+  const corners = [
+    [X + radius, Y + radius, Z + radius],
+    [X - radius, Y + radius, Z + radius],
+    [X + radius, Y - radius, Z + radius],
+    [X - radius, Y - radius, Z + radius],
+    [X + radius, Y + radius, Z - radius],
+    [X - radius, Y + radius, Z - radius],
+    [X + radius, Y - radius, Z - radius],
+    [X - radius, Y - radius, Z - radius],
+  ];
+  const positions = [
+    // front face
+    corners[3],
+    corners[2],
+    corners[0],
+    corners[1],
+
+    // back face
+    corners[7],
+    corners[5],
+    corners[4],
+    corners[6],
+
+    // top face
+    corners[5],
+    corners[1],
+    corners[0],
+    corners[4],
+    // bottom face
+    corners[7],
+    corners[6],
+    corners[2],
+    corners[3],
+
+    // right face
+    corners[6],
+    corners[4],
+    corners[0],
+    corners[2],
+
+    // left face
+    corners[7],
+    corners[3],
+    corners[1],
+    corners[5],
+  ];
+  return positions.flat();
+}
+
+export { initBuffers, buildPositionsCube, initManyCubeBuffers };

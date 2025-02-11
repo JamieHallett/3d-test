@@ -1,8 +1,25 @@
-import { initBuffers } from "./init-buffers.js";
+import {
+  buildPositionsCube,
+  initBuffers,
+  initManyCubeBuffers,
+} from "./init-buffers.js";
 import { drawScene } from "./draw-scene.js";
 
 const workers = {
   a: undefined,
+};
+
+const keyStatus = {
+  w: false,
+  a: false,
+  s: false,
+  d: false,
+  r: false,
+  f: false,
+  arrowup: false,
+  arrowdown: false,
+  arrowleft: false,
+  arrowright: false,
 };
 
 function button() {
@@ -45,13 +62,83 @@ function makeWorker(workerfunc, receivefunc, workername) {
   URL.revokeObjectURL(blobURL);
 }
 
+document.addEventListener("keydown", (event) => {
+  //console.log(event.key);
+  switch (event.key.toLowerCase()) {
+    case "w":
+      keyStatus.w = true;
+      break;
+    case "a":
+      keyStatus.a = true;
+      break;
+    case "s":
+      keyStatus.s = true;
+      break;
+    case "d":
+      keyStatus.d = true;
+      break;
+    case "r":
+      keyStatus.r = true;
+      break;
+    case "f":
+      keyStatus.f = true;
+      break;
+
+    default:
+      keyStatus[event.key.toLowerCase()] = true;
+      break;
+  }
+});
+document.addEventListener("keyup", (event) => {
+  switch (event.key.toLowerCase()) {
+    case "w":
+      keyStatus.w = false;
+      break;
+    case "a":
+      keyStatus.a = false;
+      break;
+    case "s":
+      keyStatus.s = false;
+      break;
+    case "d":
+      keyStatus.d = false;
+      break;
+    case "r":
+      keyStatus.r = false;
+      break;
+    case "f":
+      keyStatus.f = false;
+      break;
+
+    default:
+      //console.log("other key pressed:", event.key);
+      keyStatus[event.key.toLowerCase()] = false;
+      //console.log(keyStatus);
+      break;
+  }
+});
+
+const frametime = document.querySelector("#frametime");
 let cubeRotation = 0.0;
 let deltaTime = 0;
+const camera = {
+  X: 0,
+  Y: 0,
+  Z: -5,
+  getPos() {
+    return [this.X, this.Y, this.Z];
+  },
+  horizRotation: 0,
+  vertRotation: 0,
+  getRot() {
+    return [this.horizRotation, this.vertRotation];
+  },
+};
 
 function main() {
   /* more stuff 
-https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Adding_2D_content_to_a_WebGL_context
-*/
+  https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Adding_2D_content_to_a_WebGL_context
+  */
   const canvas = document.querySelector("#canvas");
   // Initialize the GL context
   const gl = canvas.getContext("webgl");
@@ -169,9 +256,49 @@ https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Adding_2D_co
 
   // Here's where we call the routine that builds all the
   // objects we'll be drawing.
-  const buffers = initBuffers(gl);
+  const buffers = initBuffers(gl, buildPositionsCube());
+  const bufferArray = initManyCubeBuffers(gl, 8, [
+    { X: 0, Y: 0, Z: 0, size: 2 },
+    { X: 0, Y: 0, Z: 3, size: 2 },
+    { X: 0, Y: 3, Z: 0, size: 2 },
+    { X: 0, Y: 3, Z: 3, size: 2 },
+    { X: 3, Y: 0, Z: 0, size: 2 },
+    { X: 3, Y: 0, Z: 3, size: 2 },
+    { X: 3, Y: 3, Z: 0, size: 2 },
+    { X: 3, Y: 3, Z: 3, size: 2 },
+  ]);
 
   let then = 0;
+
+  setInterval(function () {
+    const horizontal = keyStatus.a - keyStatus.d; // taking advantage of the fact that true == 1 and false == 0
+    const vertical = keyStatus.w - keyStatus.s;
+    const z = keyStatus.r - keyStatus.f;
+
+    const horizRotation = keyStatus.arrowright - keyStatus.arrowleft;
+    const vertRotation = keyStatus.arrowdown - keyStatus.arrowup;
+
+    let speed = 0.1;
+
+    speed /= Math.abs(horizontal) + Math.abs(vertical) + Math.abs(z);
+
+    if (horizontal || vertical || z) {
+      camera.X +=
+        speed *
+        (horizontal * Math.cos(camera.horizRotation) -
+          vertical * Math.sin(camera.horizRotation));
+      camera.Z +=
+        speed *
+        (vertical * Math.cos(camera.horizRotation) +
+          horizontal * Math.sin(camera.horizRotation));
+      camera.Y += z * speed;
+    }
+    if (horizRotation || vertRotation) {
+      camera.horizRotation += horizRotation * 0.05;
+      camera.vertRotation += vertRotation * 0.05;
+      console.log(camera.horizRotation, camera.vertRotation);
+    }
+  }, 10);
 
   // Draw the scene repeatedly
   function render(now) {
@@ -179,7 +306,16 @@ https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Adding_2D_co
     deltaTime = now - then;
     then = now;
 
-    drawScene(gl, programInfo, buffers, cubeRotation);
+    frametime.innerText = `${(deltaTime * 1000).toFixed(1)}ms, ${(1 / deltaTime).toFixed(1)}fps`;
+
+    drawScene(
+      gl,
+      programInfo,
+      buffers,
+      camera.getRot(),
+      camera.getPos(),
+      bufferArray,
+    );
     cubeRotation += deltaTime;
 
     requestAnimationFrame(render);
