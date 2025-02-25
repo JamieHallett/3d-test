@@ -14,17 +14,19 @@ function initBuffers(gl, positionList) {
 
 function initManyCubeBuffers(
   gl,
-  numCubes,
+  numCubes = 1,
   objs = [{ X: 0, Y: 0, Z: 0, size: 2 }],
+  permanent = false,
 ) {
   const buffers = [];
-  const colorBuffer = initColorBuffer(gl);
-  const indexBuffer = initIndexBuffer(gl);
+  //const colorBuffer = initColorBuffer(gl);
+  //const indexBuffer = initIndexBuffer(gl);
   for (let i = 0; i < numCubes; i++) {
     buffers.push({
       position: initPositionBuffer(gl, buildPositionsCube(objs[i])),
-      color: colorBuffer,
-      indices: indexBuffer,
+      color: initColorBuffer(gl),
+      indices: initIndexBuffer(gl),
+      permanent,
     });
   }
   return buffers;
@@ -183,6 +185,7 @@ function buildPositionsCube(obj = { X: 0, Y: 0, Z: 0, size: 2 }) {
     corners[1],
     corners[0],
     corners[4],
+
     // bottom face
     corners[7],
     corners[6],

@@ -1,7 +1,7 @@
 function drawScene(
   gl,
   programInfo,
-  buffers,
+  fov,
   cameraRot = [0.0, 0.0],
   cameraPos = [0.0, 0.0, -3.0],
   bufferArray,
@@ -22,10 +22,10 @@ function drawScene(
   // and we only want to see objects between 0.1 units
   // and 100 units away from the camera.
 
-  const fieldOfView = (90 * Math.PI) / 180; // in radians
+  const fieldOfView = (fov * Math.PI) / 180; // in radians
   const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
   const zNear = 0.1;
-  const zFar = 100.0;
+  const zFar = 10000.0;
   const projectionMatrix = mat4.create();
 
   // note: glMatrix always has the first argument
@@ -36,34 +36,26 @@ function drawScene(
   // the center of the scene.
   const modelViewMatrix = mat4.create();
 
-  
   // Now move the drawing position a bit to where we want to
   // start drawing the cubes.
   mat4.rotate(
     modelViewMatrix, // destination matrix
     modelViewMatrix, // matrix to rotate
-    cameraRot[1], // amount to rotate in radians
-    [0, 0, 1],
-  ); // axis to rotate around (Z)
+    -cameraRot[0], // amount to rotate in radians
+    [0, 1, 0], // axis to rotate around (Y)
+  );
   mat4.rotate(
     modelViewMatrix, // destination matrix
     modelViewMatrix, // matrix to rotate
-    cameraRot[0], // amount to rotate in radians
-    [0, 1, 0],
-  ); // axis to rotate around (Y)
-  /*
-  mat4.rotate(
-    modelViewMatrix, // destination matrix
-    modelViewMatrix, // matrix to rotate
-    cameraRot[1], // amount to rotate in radians
-    [1, 0, 0],
-  ); // axis to rotate around (X)
-  */
+    -cameraRot[1], // amount to rotate in radians
+    [Math.cos(-cameraRot[0]), 0, Math.sin(-cameraRot[0])], // axis to rotate around is horizontal, perpendicular to the camera
+  );
+
   mat4.translate(
     modelViewMatrix, // destination matrix
     modelViewMatrix, // matrix to translate
-    cameraPos,
-  ); // amount to translate
+    cameraPos.map((value) => -value), // amount to translate
+  );
 
   // draw the elements
   const len = bufferArray.length;
@@ -78,7 +70,13 @@ function drawScene(
   }
 }
 
-function drawElem(gl, programInfo, buffers, projectionMatrix, modelViewMatrix) {
+function drawElem(
+  gl,
+  programInfo,
+  buffers,
+  projectionMatrix,
+  modelViewMatrix,
+) {
   // Tell WebGL how to pull out the positions from the position
   // buffer into the vertexPosition attribute.
   setPositionAttribute(gl, buffers, programInfo);
@@ -108,6 +106,14 @@ function drawElem(gl, programInfo, buffers, projectionMatrix, modelViewMatrix) {
     const type = gl.UNSIGNED_SHORT;
     const offset = 0;
     gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+  }
+
+  // check if buffer should be deleted, we can't just fill up the memory
+  if (!buffers.permanent) {
+    buffers.permanent = undefined;
+    for (const key in buffers) {
+      gl.deleteBuffer(buffers[key]);
+    }
   }
 }
 
