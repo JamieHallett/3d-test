@@ -1,5 +1,5 @@
-function initBuffers(gl, positionList) {
-  const positionBuffer = initPositionBuffer(gl, positionList);
+function initBuffers(gl, positionList, usage) {
+  const positionBuffer = initPositionBuffer(gl, positionList, usage);
 
   const colorBuffer = initColorBuffer(gl);
 
@@ -17,13 +17,14 @@ function initManyCubeBuffers(
   numCubes = 1,
   objs = [{ X: 0, Y: 0, Z: 0, size: 2 }],
   permanent = false,
+  usage = gl.STATIC_DRAW,
 ) {
   const buffers = [];
   //const colorBuffer = initColorBuffer(gl);
   //const indexBuffer = initIndexBuffer(gl);
   for (let i = 0; i < numCubes; i++) {
     buffers.push({
-      position: initPositionBuffer(gl, buildPositionsCube(objs[i])),
+      position: initPositionBuffer(gl, buildPositionsCube(objs[i]), usage),
       color: initColorBuffer(gl),
       indices: initIndexBuffer(gl),
       permanent,
@@ -32,7 +33,24 @@ function initManyCubeBuffers(
   return buffers;
 }
 
-function initPositionBuffer(gl, positionList) {
+function updateManyCubeBuffers(
+  gl,
+  objs = [{ X: 0, Y: 0, Z: 0, size: 2, buffers: {} }],
+) {
+  const newobjs = [];
+  const len = objs.length;
+  for (let i = 0; i < len; i++) {
+    newobjs.push(Object.assign({}, objs[i]));
+    newobjs[i].buffers.position = updatePositionBuffer(
+      gl,
+      objs[i].buffers.position,
+      buildPositionsCube(objs[i]),
+    );
+  }
+  return newobjs;
+}
+
+function initPositionBuffer(gl, positionList, usage = gl.STATIC_DRAW) {
   // Create a buffer for the square's positions.
   const positionBuffer = gl.createBuffer();
 
@@ -64,8 +82,14 @@ function initPositionBuffer(gl, positionList) {
   // Now pass the list of positions into WebGL to build the
   // shape. We do this by creating a Float32Array from the
   // JavaScript array, then use it to fill the current buffer.
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), usage);
 
+  return positionBuffer;
+}
+
+function updatePositionBuffer(gl, positionBuffer, positions) {
+  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+  gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Float32Array(positions));
   return positionBuffer;
 }
 
@@ -207,4 +231,9 @@ function buildPositionsCube(obj = { X: 0, Y: 0, Z: 0, size: 2 }) {
   return positions.flat();
 }
 
-export { initBuffers, buildPositionsCube, initManyCubeBuffers };
+export {
+  initBuffers,
+  buildPositionsCube,
+  initManyCubeBuffers,
+  updateManyCubeBuffers,
+};

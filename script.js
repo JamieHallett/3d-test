@@ -2,6 +2,7 @@ import {
   buildPositionsCube,
   initBuffers,
   initManyCubeBuffers,
+  updateManyCubeBuffers,
 } from "./init-buffers.js";
 import { drawScene } from "./draw-scene.js";
 
@@ -155,6 +156,7 @@ class Projectile {
     vel = [0.0, 0.0, 0.0],
     size,
     dmg,
+    buffers,
   ) {
     this.type = "projectile";
     this.id = origin.id + "#" + projectileID;
@@ -168,6 +170,7 @@ class Projectile {
     this.ownerID = origin.id;
     artillery[origin.id + "#" + projectileID] = this;
     projectileID++; // projectileID is only incremented after (this is important)
+    this.buffers = buffers;
   }
 }
 
@@ -258,10 +261,9 @@ function main() {
   https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Adding_2D_content_to_a_WebGL_context
   */
   // Initialize the GL context
-  const gl = canvas.getContext(
-    "webgl",
-    {powerPreference: "high-performance"},
-  );
+  const gl = canvas.getContext("webgl", {
+    powerPreference: "high-performance",
+  });
   console.log(gl.getContextAttributes());
 
   // Set clear color to black, fully opaque
@@ -392,6 +394,7 @@ function main() {
       { X: 3, Y: 3, Z: 3, size: 2 },
     ],
     true,
+    gl.STATIC_DRAW,
   );
 
   let then = 0;
@@ -406,16 +409,23 @@ function main() {
 
     frametime.innerText = `${(deltaTime * 1000).toFixed(2)}ms, ${(1 / deltaTime).toFixed(1)}fps`;
 
-    const projecArray = Object.values(artillery);
-    const projectileBuffers = initManyCubeBuffers(
+    const projecArray = updateManyCubeBuffers(gl, Object.values(artillery));
+    const projectileBuffers = projecArray.map((projec)=>projec.buffers)
+    /* 
+    initManyCubeBuffers(
       gl,
       projecArray.length,
       projecArray,
+      false,
+      gl.DYNAMIC_DRAW,
     );
+    */
+    
     const bufferArray = cubeBuffers.concat(projectileBuffers);
 
     if (keyStatus.b) {
       console.log(bufferArray, projecArray); ////////////////
+      console.log(projectileBuffers)
     }
 
     drawScene(
@@ -483,6 +493,9 @@ function cameraMove() {
 function makeprojectile(
   origin = { X: 0, Y: 0, Z: 0, rot: [0, 0], id: "no_owner" },
 ) {
+  const gl = canvas.getContext("webgl", {
+    powerPreference: "high-performance",
+  })
   const weapon = weapons.current;
   const sin_theta = Math.sin(origin.rot[0]);
   const cos_theta = Math.cos(origin.rot[0]);
@@ -497,6 +510,7 @@ function makeprojectile(
     const perpendicularY = velX;
     const len = weapon.projecMult;
     for (let i = 0; i < len; i++) {
+      // to be implemented for 3d version ///////////////////////////////////////////////////////////////////////////////////////////////
       // there can only be multiple projectiles if there is an inaccuracy, because it would just act as 1 projectile if 100% accurate
       const random = Math.random();
       randomlist.push(random); // add to randomlist to send to server
@@ -509,12 +523,25 @@ function makeprojectile(
         weapon.dmg,
       );
     }
-  }
-  if (weapon.inacc == 0) {
+  } else {
     // if weapon is inaccurate, projectile will be created in the for loop above
-    console.log(new Projectile(origin, [velX, velY, velZ], 0.1, weapon.dmg));
+    console.log(
+      new Projectile(
+        origin,
+        [velX, velY, velZ],
+        0.1,
+        weapon.dmg,
+        initManyCubeBuffers(
+          gl,
+          1,
+          Object.assign({}, origin, [{ size: 0.1 }]),
+          true,
+          gl.DYNAMIC_DRAW,
+        )[0],
+      ),
+    );
   }
-  console.log(artillery); /////////////////////////////////////////
+  // console.log(artillery); /////////////////////////////////////////
 }
 
 function projectilemove() {
