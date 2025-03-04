@@ -89,7 +89,7 @@ document.addEventListener("keydown", (event) => {
       camera.moveSens = 0.001;
       break;
     case "v":
-      makeprojectile(camera);
+      setFiring(true);
       break;
 
     default:
@@ -120,6 +120,28 @@ document.addEventListener("keyup", (event) => {
     case "z":
       camera.fov = 90;
       camera.moveSens = 0.01;
+      break;
+    case "v":
+      setFiring(false);
+      break;
+
+    case "1":
+      weapons.code = "a";
+      break;
+    case "2":
+      weapons.code = "b";
+      break;
+    case "3":
+      weapons.code = "c";
+      break;
+    case "4":
+      weapons.code = "d";
+      break;
+    case "5":
+      weapons.code = "slowtest";
+      break;
+    case "6":
+      weapons.code = "fasttest";
       break;
 
     default:
@@ -199,6 +221,9 @@ const camera = {
 let projectileID = 0;
 const artillery = {};
 const players = {};
+let firing = false;
+let canFire = true;
+let firingIntervalID = 0;
 const weapons = {
   code: "slowtest", // this is the default weapon
   get current() {
@@ -248,6 +273,16 @@ const weapons = {
     rate: 4.16,
     interval: 240,
     dmg: 1000,
+    dmgrange: { start: 25, end: 75, endval: 20 },
+    vel: 1,
+    auto: false,
+    inacc: 0,
+    projecMult: 1,
+  },
+  fasttest: {
+    rate: 1000,
+    interval: 1,
+    dmg: 1,
     dmgrange: { start: 25, end: 75, endval: 20 },
     vel: 1,
     auto: false,
@@ -410,7 +445,7 @@ function main() {
     frametime.innerText = `${(deltaTime * 1000).toFixed(2)}ms, ${(1 / deltaTime).toFixed(1)}fps`;
 
     const projecArray = updateManyCubeBuffers(gl, Object.values(artillery));
-    const projectileBuffers = projecArray.map((projec)=>projec.buffers)
+    const projectileBuffers = projecArray.map((projec) => projec.buffers);
     /* 
     initManyCubeBuffers(
       gl,
@@ -420,12 +455,12 @@ function main() {
       gl.DYNAMIC_DRAW,
     );
     */
-    
+
     const bufferArray = cubeBuffers.concat(projectileBuffers);
 
     if (keyStatus.b) {
       console.log(bufferArray, projecArray); ////////////////
-      console.log(projectileBuffers)
+      console.log(projectileBuffers);
     }
 
     drawScene(
@@ -490,12 +525,41 @@ function cameraMove() {
   }
 }
 
+function setFiring(startfire) {
+  if (!firing && startfire && canFire) {
+    // if not already firing and can fire
+    const currentWeapon = weapons.current;
+    makeprojectile(camera); // fire 1st projectile
+    firingIntervalID = setInterval(
+      // set interval for firing
+      function () {
+        makeprojectile(camera); // fire next projectile(s)
+        canFire = false; // cannot fire as it has fired just now
+        setTimeout(() => {
+          canFire = true;
+        }, currentWeapon.interval); // can now fire as fire rate has passed
+      },
+      currentWeapon.interval,
+    );
+    firing = true;
+    canFire = false; // cannot fire as it has fired just now
+    setTimeout(() => {
+      canFire = true;
+    }, currentWeapon.interval); // can now fire as fire rate has passed
+  } else if (!startfire) {
+    // stop firing
+    clearInterval(firingIntervalID);
+    firing = false;
+  }
+}
+
 function makeprojectile(
   origin = { X: 0, Y: 0, Z: 0, rot: [0, 0], id: "no_owner" },
 ) {
+  //camera.vertRotation+=(Math.random())*0.1; // recoil
   const gl = canvas.getContext("webgl", {
     powerPreference: "high-performance",
-  })
+  });
   const weapon = weapons.current;
   const sin_theta = Math.sin(origin.rot[0]);
   const cos_theta = Math.cos(origin.rot[0]);
@@ -517,17 +581,6 @@ function makeprojectile(
       const randomInacc = random * weapon.inacc * 2 - weapon.inacc;
       new Projectile(
         origin,
-        velX + perpendicularX * randomInacc,
-        velY + perpendicularY * randomInacc,
-        5,
-        weapon.dmg,
-      );
-    }
-  } else {
-    // if weapon is inaccurate, projectile will be created in the for loop above
-    console.log(
-      new Projectile(
-        origin,
         [velX, velY, velZ],
         0.1,
         weapon.dmg,
@@ -538,7 +591,22 @@ function makeprojectile(
           true,
           gl.DYNAMIC_DRAW,
         )[0],
-      ),
+      );
+    }
+  } else {
+    // if weapon is inaccurate, projectile will be created in the for loop above
+    new Projectile(
+      origin,
+      [velX, velY, velZ],
+      0.1,
+      weapon.dmg,
+      initManyCubeBuffers(
+        gl,
+        1,
+        Object.assign({}, origin, [{ size: 0.1 }]),
+        true,
+        gl.DYNAMIC_DRAW,
+      )[0],
     );
   }
   // console.log(artillery); /////////////////////////////////////////
