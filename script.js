@@ -59,6 +59,9 @@ function makeWorker(workerfunc, receivefunc, workername) {
   );
   workers[workername] = new Worker(blobURL); // Use the url to create the worker
   workers[workername].onmessage = receivefunc; // Set receivefunc to be called when the worker sends a message
+  workers[workername].onerror = function (e) {
+    console.log(e);
+  };
   // Won't be needing this anymore
   URL.revokeObjectURL(blobURL);
 }
@@ -201,14 +204,14 @@ let cubeRotation = 0.0;
 let deltaTime = 0;
 const loopfreq = 100; // measured in hz
 const camera = {
-  X: 0,
-  Y: 0,
-  Z: 5,
+  X: 5,
+  Y: 5,
+  Z: 10,
   getPos() {
     return [this.X, this.Y, this.Z];
   },
-  horizRotation: 0,
-  vertRotation: 0,
+  horizRotation: 0.3,
+  vertRotation: -0.5,
   getRot() {
     return [this.horizRotation, this.vertRotation];
   },
@@ -219,7 +222,7 @@ const camera = {
   moveSens: 0.01,
 };
 let projectileID = 0;
-const artillery = {};
+let artillery = {};
 const players = {};
 let firing = false;
 let canFire = true;
@@ -274,22 +277,117 @@ const weapons = {
     interval: 240,
     dmg: 1000,
     dmgrange: { start: 25, end: 75, endval: 20 },
-    vel: 1,
+    vel: 10,
     auto: false,
     inacc: 0,
     projecMult: 1,
   },
   fasttest: {
-    rate: 1000,
-    interval: 1,
+    rate: 100,
+    interval: 10,
     dmg: 1,
     dmgrange: { start: 25, end: 75, endval: 20 },
-    vel: 1,
+    vel: 10,
     auto: false,
     inacc: 0,
     projecMult: 1,
   },
 };
+
+//
+// Initialize a texture and load an image.
+// When the image finished loading copy it into the texture.
+//
+function loadTexture(gl, url) {
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+
+  // Because images have to be downloaded over the internet
+  // they might take a moment until they are ready.
+  // Until then put a single pixel in the texture so we can
+  // use it immediately. When the image has finished downloading
+  // we'll update the texture with the contents of the image.
+  const level = 0;
+  const internalFormat = gl.RGBA;
+  const width = 1;
+  const height = 1;
+  const border = 0;
+  const srcFormat = gl.RGBA;
+  const srcType = gl.UNSIGNED_BYTE;
+  const pixel = new Uint8Array([0, 0, 255, 255]); // opaque blue
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    level,
+    internalFormat,
+    width,
+    height,
+    border,
+    srcFormat,
+    srcType,
+    pixel,
+  );
+
+  const image = new Image();
+  image.onload = () => {
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      level,
+      internalFormat,
+      srcFormat,
+      srcType,
+      image,
+    );
+
+    // WebGL1 has different requirements for power of 2 images
+    // vs. non power of 2 images so check if the image is a
+    // power of 2 in both dimensions.
+    if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
+      // Yes, it's a power of 2. Generate mips.
+      gl.generateMipmap(gl.TEXTURE_2D);
+    } else {
+      // No, it's not a power of 2. Turn off mips and set
+      // wrapping to clamp to edge
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    }
+  };
+  image.src = url;
+
+  return texture;
+}
+
+function makeSimpleTexture(gl) {
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+
+  const level = 0;
+  const internalFormat = gl.RGBA;
+  const width = 1;
+  const height = 1;
+  const border = 0;
+  const srcFormat = gl.RGBA;
+  const srcType = gl.UNSIGNED_BYTE;
+  const pixel = new Uint8Array([192, 192, 192, 255]); // opaque light grey
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    level,
+    internalFormat,
+    width,
+    height,
+    border,
+    srcFormat,
+    srcType,
+    pixel,
+  );
+
+  return texture;
+}
+
+function isPowerOf2(value) {
+  return (value & (value - 1)) === 0;
+}
 
 function main() {
   /* more stuff 
@@ -310,26 +408,28 @@ function main() {
 
   const vsSource = `
     attribute vec4 aVertexPosition;
-    attribute vec4 aVertexColor;
+    attribute vec2 aTextureCoord;
 
     uniform mat4 uModelViewMatrix;
     uniform mat4 uProjectionMatrix;
 
-    varying lowp vec4 vColor;
+    varying highp vec2 vTextureCoord;
 
     void main(void) {
       gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-      vColor = aVertexColor;
+      vTextureCoord = aTextureCoord;
     }
   `;
 
   // Fragment shader program
 
   const fsSource = `
-    varying lowp vec4 vColor;
+    varying highp vec2 vTextureCoord;
+
+    uniform sampler2D uSampler;
 
     void main(void) {
-      gl_FragColor = vColor;
+      gl_FragColor = texture2D(uSampler, vTextureCoord);
     }
   `;
 
@@ -401,7 +501,7 @@ function main() {
     program: shaderProgram,
     attribLocations: {
       vertexPosition: gl.getAttribLocation(shaderProgram, "aVertexPosition"),
-      vertexColor: gl.getAttribLocation(shaderProgram, "aVertexColor"),
+      textureCoord: gl.getAttribLocation(shaderProgram, "aTextureCoord"),
     },
     uniformLocations: {
       projectionMatrix: gl.getUniformLocation(
@@ -409,6 +509,7 @@ function main() {
         "uProjectionMatrix",
       ),
       modelViewMatrix: gl.getUniformLocation(shaderProgram, "uModelViewMatrix"),
+      uSampler: gl.getUniformLocation(shaderProgram, "uSampler"),
     },
   };
 
@@ -431,13 +532,105 @@ function main() {
     true,
     gl.STATIC_DRAW,
   );
+  cubeBuffers.push(
+    initManyCubeBuffers(
+      gl,
+      1,
+      [{ X: 0, Y: -5001, Z: 0, size: 10000 }],
+      true,
+      gl.STATIC_DRAW,
+      true,
+    )[0],
+  );
+
+  // Load texture
+  const texture = loadTexture(gl, "square.svg");
+  const floortexture = loadTexture(gl, "square.svg");
+  // Flip image pixels into the bottom-to-top order that WebGL expects.
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
   let then = 0;
 
-  setInterval(loop, 10);
+  setInterval(loop, 1 / loopfreq);
+  makeWorker(
+    () => {
+      onmessage = (e) => {
+        function projectilemove(artillery, loopfreq) {
+          // also checks collision with players
+          const deletionList = [];
+          Object.values(artillery).forEach((projectile) => {
+            const collidedPlayers = [];
+            for (const player of Object.values(players)) {
+              // check all players for collision, add collided to array
+              if (collisionPredict(projectile, player)) {
+                // add player to collided if hit
+                collidedPlayers.push(player);
+              }
+            }
+            for (const i in collidedPlayers) {
+              // do not hit owner
+              if (collidedPlayers[i].id == projectile.ownerID) {
+                collidedPlayers.splice(i, 1);
+                break;
+              }
+            }
+
+            // if players are collided, continue
+            if (collidedPlayers.length > 0) {
+              deletionList.push(projectile.id); // schedule projectile for deletion
+              let closestTarget;
+              // see which target is closest
+              collidedPlayers.forEach((target) => {
+                // if first in the list, set it as the closest
+                if (closestTarget == undefined) {
+                  closestTarget = target;
+                  return;
+                }
+                // if closer, set as closest (for now)
+                if (
+                  Math.sqrt(
+                    (target.X - projectile.X) ** 2 +
+                      (target.Y - projectile.Y) ** 2,
+                  ) <
+                  Math.sqrt(
+                    (closestTarget.X - projectile.X) ** 2 +
+                      (closestTarget.Y - projectile.Y) ** 2,
+                  )
+                ) {
+                  closestTarget = target;
+                  return;
+                }
+              });
+            }
+
+            // do movement after collision check
+            projectile.X += projectile.vel[0] / loopfreq;
+            projectile.Y += projectile.vel[2] / loopfreq;
+            projectile.Z += projectile.vel[1] / loopfreq;
+
+            // do gravity
+            projectile.vel[2] -= 0.1;
+          });
+          deletionList.forEach((id) => {
+            delete artillery[id];
+          });
+          return artillery;
+        }
+        postMessage(projectilemove(e.data.artillery, e.data.loopfreq));
+      };
+    },
+    (e) => {
+      artillery = e.data;
+    },
+    "projectilemove",
+  );
 
   // Draw the scene repeatedly
   function render(now) {
+    if (keyStatus.m) {
+      requestAnimationFrame(render);
+      return;
+    }
     now *= 0.001; // convert to seconds
     deltaTime = now - then;
     then = now;
@@ -470,6 +663,7 @@ function main() {
       camera.getRot(),
       camera.getPos(),
       bufferArray,
+      texture,
     );
     cubeRotation += deltaTime;
     if (deltaTime > 0.03) {
@@ -484,8 +678,12 @@ function main() {
 main();
 
 function loop() {
+  if (keyStatus.n) {
+    return;
+  }
   cameraMove();
-  projectilemove();
+  //workers["projectilemove"].postMessage({ artillery, loopfreq });
+  artillery = projectilemove(artillery, loopfreq);
   document.querySelector("#projecCount").innerText =
     Object.keys(artillery).length;
 }
@@ -612,7 +810,7 @@ function makeprojectile(
   // console.log(artillery); /////////////////////////////////////////
 }
 
-function projectilemove() {
+function projectilemove(artillery, loopfreq) {
   // also checks collision with players
   const deletionList = [];
   Object.values(artillery).forEach((projectile) => {
@@ -663,8 +861,81 @@ function projectilemove() {
     projectile.X += projectile.vel[0] / loopfreq;
     projectile.Y += projectile.vel[2] / loopfreq;
     projectile.Z += projectile.vel[1] / loopfreq;
+
+    // do gravity
+    projectile.vel[2] -= 0.1;
   });
   deletionList.forEach((id) => {
     delete artillery[id];
   });
+  return artillery;
+}
+
+function collision(obj1, obj2, obj1IsPoint = false) {
+  const diffX = obj1.X - obj2.X;
+  const diffY = obj1.Y - obj2.Y;
+  const dist = Math.sqrt(diffX * diffX + diffY * diffY);
+  if (dist > obj1.size + obj2.size) {
+    return false;
+  } // return if objects are way too far for collision
+  if (obj1IsPoint) {
+    if (
+      obj1.X > obj2.X - obj2.size / 2 &&
+      obj1.X < obj2.X + obj2.size / 2 &&
+      obj1.Y > obj2.Y - obj2.size / 2 &&
+      obj1.Y < obj2.Y + obj2.size / 2
+    ) {
+      // true if obj1's centre is within bounds of obj2
+      return true;
+    }
+  } else {
+    if (
+      obj1.X + obj1.size / 2 > obj2.X - obj2.size / 2 &&
+      obj1.X - obj1.size / 2 < obj2.X + obj2.size / 2 &&
+      obj1.Y + obj1.size / 2 > obj2.Y - obj2.size / 2 &&
+      obj1.Y - obj1.size / 2 < obj2.Y + obj2.size / 2
+    ) {
+      // true if obj1's bounds are within bounds of obj2
+      return true;
+    }
+  }
+  return false;
+}
+
+function collisionPredict(obj1, obj2) {
+  // here obj1 is always a point, and obj2 is assumed to be stationary
+  const diffX = obj1.X - obj2.X;
+  const diffY = obj1.Y - obj2.Y;
+  const dist = Math.sqrt(diffX * diffX + diffY * diffY);
+
+  if (collision(obj1, obj2, true)) {
+    return true;
+  } // if objects are already colliding, return true
+
+  const spd = Math.sqrt(obj1.Xvel * obj1.Xvel + obj1.Yvel * obj1.Yvel);
+
+  if (dist > spd) {
+    return false;
+  } // if obj1 cannot reach obj2 in time, return false
+
+  const corners = [
+    { X: diffX - obj2.size / 2, Y: diffY - obj2.size / 2 },
+    { X: diffX + obj2.size / 2, Y: diffY - obj2.size / 2 },
+    { X: diffX - obj2.size / 2, Y: diffY + obj2.size / 2 },
+    { X: diffX + obj2.size / 2, Y: diffY + obj2.size / 2 },
+  ];
+
+  const notaDotProduct = [];
+
+  for (let i = 0; i < 4; i++) {
+    notaDotProduct.push(
+      Math.sign(corners[i].X * obj1.Yvel - corners[i].Y * obj1.Xvel),
+    );
+  } // this calculates if velocity vector is clockwise or counterclockwise from the corner vector (not a dot product)
+
+  if (new Set(notaDotProduct).size > 1) {
+    return true;
+  } // if corner angles are only clockwise or only counterclockwise of velocity vector, return true
+
+  return false; // if the above did not return true
 }

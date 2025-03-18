@@ -5,6 +5,7 @@ function drawScene(
   cameraRot = [0.0, 0.0],
   cameraPos = [0.0, 0.0, -3.0],
   bufferArray,
+  texture,
 ) {
   gl.clearColor(0.0, 0.0, 0.0, 1.0); // Clear to black, fully opaque
   gl.clearDepth(1.0); // Clear everything
@@ -20,12 +21,12 @@ function drawScene(
   // Our field of view is 90 degrees, with a width/height
   // ratio that matches the display size of the canvas
   // and we only want to see objects between 0.1 units
-  // and 100 units away from the camera.
+  // and 100,000 units away from the camera.
 
   const fieldOfView = (fov * Math.PI) / 180; // in radians
   const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
   const zNear = 0.1;
-  const zFar = 10000.0;
+  const zFar = 100000.0;
   const projectionMatrix = mat4.create();
 
   // note: glMatrix always has the first argument
@@ -66,6 +67,7 @@ function drawScene(
       bufferArray[i],
       projectionMatrix,
       modelViewMatrix,
+      texture,
     );
   }
 }
@@ -76,12 +78,13 @@ function drawElem(
   buffers,
   projectionMatrix,
   modelViewMatrix,
+  texture,
 ) {
   // Tell WebGL how to pull out the positions from the position
   // buffer into the vertexPosition attribute.
   setPositionAttribute(gl, buffers, programInfo);
-  // colors too
-  setColorAttribute(gl, buffers, programInfo);
+  // textures too
+  setTextureAttribute(gl, buffers, programInfo);
 
   // Tell WebGL which indices to use to index the vertices
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.indices);
@@ -100,6 +103,16 @@ function drawElem(
     false,
     modelViewMatrix,
   );
+  
+  // Tell WebGL we want to affect texture unit 0
+  gl.activeTexture(gl.TEXTURE0);
+
+  // Bind the texture to texture unit 0
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+
+  // Tell the shader we bound the texture to texture unit 0
+  gl.uniform1i(programInfo.uniformLocations.uSampler, 0);
+
 
   {
     const vertexCount = 36;
@@ -109,12 +122,15 @@ function drawElem(
   }
 
   // check if buffer should be deleted, we can't just fill up the memory
+  // we dont delete buffers anymore
+  /*
   if (!buffers.permanent) {
     buffers.permanent = undefined;
     for (const key in buffers) {
       gl.deleteBuffer(buffers[key]);
     }
   }
+  */
 }
 
 // Tell WebGL how to pull out the positions from the position
@@ -157,5 +173,25 @@ function setColorAttribute(gl, buffers, programInfo) {
   );
   gl.enableVertexAttribArray(programInfo.attribLocations.vertexColor);
 }
+
+// tell webgl how to pull out the texture coordinates from buffer
+function setTextureAttribute(gl, buffers, programInfo) {
+  const num = 2; // every coordinate composed of 2 values
+  const type = gl.FLOAT; // the data in the buffer is 32-bit float
+  const normalize = false; // don't normalize
+  const stride = 0; // how many bytes to get from one set to the next
+  const offset = 0; // how many bytes inside the buffer to start from
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffers.textureCoord);
+  gl.vertexAttribPointer(
+    programInfo.attribLocations.textureCoord,
+    num,
+    type,
+    normalize,
+    stride,
+    offset,
+  );
+  gl.enableVertexAttribArray(programInfo.attribLocations.textureCoord);
+}
+
 
 export { drawScene };

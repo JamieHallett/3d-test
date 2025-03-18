@@ -1,13 +1,13 @@
-function initBuffers(gl, positionList, usage) {
-  const positionBuffer = initPositionBuffer(gl, positionList, usage);
+function initBuffers(gl, obj, usage) {
+  const positionBuffer = initPositionBuffer(gl, buildPositionsCube(obj), usage);
 
-  const colorBuffer = initColorBuffer(gl);
+  const textureCoordBuffer = initTextureBuffer(gl);
 
   const indexBuffer = initIndexBuffer(gl);
 
   return {
     position: positionBuffer,
-    color: colorBuffer,
+    textureCoord: textureCoordBuffer,
     indices: indexBuffer,
   };
 }
@@ -18,6 +18,7 @@ function initManyCubeBuffers(
   objs = [{ X: 0, Y: 0, Z: 0, size: 2 }],
   permanent = false,
   usage = gl.STATIC_DRAW,
+  alternatecolors = false,
 ) {
   const buffers = [];
   //const colorBuffer = initColorBuffer(gl);
@@ -25,7 +26,8 @@ function initManyCubeBuffers(
   for (let i = 0; i < numCubes; i++) {
     buffers.push({
       position: initPositionBuffer(gl, buildPositionsCube(objs[i]), usage),
-      color: initColorBuffer(gl),
+      color: initColorBuffer(gl, alternatecolors),
+      textureCoord: initTextureBuffer(gl),
       indices: initIndexBuffer(gl),
       permanent,
     });
@@ -93,15 +95,24 @@ function updatePositionBuffer(gl, positionBuffer, positions) {
   return positionBuffer;
 }
 
-function initColorBuffer(gl) {
-  const faceColors = [
-    [1.0, 1.0, 1.0, 1.0], // Front face: white
-    [1.0, 0.0, 0.0, 1.0], // Back face: red
-    [0.0, 1.0, 0.0, 1.0], // Top face: green
-    [0.0, 0.0, 1.0, 1.0], // Bottom face: blue
-    [1.0, 1.0, 0.0, 1.0], // Right face: yellow
-    [1.0, 0.0, 1.0, 1.0], // Left face: purple
-  ];
+function initColorBuffer(gl, alternatecolors = false) {
+  const faceColors = alternatecolors
+    ? [
+        [0.8, 0.8, 0.8, 1.0], // Front face: grey
+        [0.8, 0.0, 0.0, 1.0], // Back face: red
+        [0.0, 0.8, 0.0, 1.0], // Top face: green
+        [0.0, 0.0, 0.8, 1.0], // Bottom face: blue
+        [0.8, 0.8, 0.0, 1.0], // Right face: yellow
+        [0.8, 0.0, 0.8, 1.0], // Left face: purple
+      ]
+    : [
+        [1.0, 1.0, 1.0, 1.0], // Front face: white
+        [1.0, 0.0, 0.0, 1.0], // Back face: red
+        [0.0, 1.0, 0.0, 1.0], // Top face: green
+        [0.0, 0.0, 1.0, 1.0], // Bottom face: blue
+        [1.0, 1.0, 0.0, 1.0], // Right face: yellow
+        [1.0, 0.0, 1.0, 1.0], // Left face: purple
+      ];
 
   // Convert the array of colors into a table for all the vertices.
 
@@ -176,6 +187,34 @@ function initIndexBuffer(gl) {
   );
 
   return indexBuffer;
+}
+
+function initTextureBuffer(gl) {
+  const textureCoordBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordBuffer);
+
+  const textureCoordinates = [
+    // Front
+    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+    // Back
+    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+    // Top
+    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+    // Bottom
+    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+    // Right
+    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+    // Left
+    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+  ];
+
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new Float32Array(textureCoordinates),
+    gl.STATIC_DRAW,
+  );
+
+  return textureCoordBuffer;
 }
 
 function buildPositionsCube(obj = { X: 0, Y: 0, Z: 0, size: 2 }) {
