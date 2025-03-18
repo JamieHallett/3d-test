@@ -161,6 +161,7 @@ canvas.addEventListener("click", async () => {
   await canvas.requestPointerLock({
     unadjustedMovement: true,
   });
+  document.querySelector("#canvascontainer").requestFullscreen()
 });
 
 canvas.addEventListener("mousemove", (event) => {
@@ -210,8 +211,8 @@ const camera = {
   getPos() {
     return [this.X, this.Y, this.Z];
   },
-  horizRotation: 0.3,
-  vertRotation: -0.5,
+  horizRotation: 0.2,
+  vertRotation: -0.3,
   getRot() {
     return [this.horizRotation, this.vertRotation];
   },
@@ -408,16 +409,30 @@ function main() {
 
   const vsSource = `
     attribute vec4 aVertexPosition;
+    attribute vec3 aVertexNormal;
     attribute vec2 aTextureCoord;
 
+    uniform mat4 uNormalMatrix;
     uniform mat4 uModelViewMatrix;
     uniform mat4 uProjectionMatrix;
 
     varying highp vec2 vTextureCoord;
+    varying highp vec3 vLighting;
 
     void main(void) {
       gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
       vTextureCoord = aTextureCoord;
+
+      // Apply lighting effect
+
+      highp vec3 ambientLight = vec3(0.3, 0.3, 0.3);
+      highp vec3 directionalLightColor = vec3(1, 1, 1);
+      highp vec3 directionalVector = normalize(vec3(0.85, 0.8, 0.75));
+
+      highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
+
+      highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
+      vLighting = ambientLight + (directionalLightColor * directional);
     }
   `;
 
@@ -425,11 +440,14 @@ function main() {
 
   const fsSource = `
     varying highp vec2 vTextureCoord;
+    varying highp vec3 vLighting;
 
     uniform sampler2D uSampler;
 
     void main(void) {
-      gl_FragColor = texture2D(uSampler, vTextureCoord);
+      highp vec4 texelColor = texture2D(uSampler, vTextureCoord);
+
+      gl_FragColor = vec4(texelColor.rgb * vLighting, texelColor.a);
     }
   `;
 
@@ -501,6 +519,7 @@ function main() {
     program: shaderProgram,
     attribLocations: {
       vertexPosition: gl.getAttribLocation(shaderProgram, "aVertexPosition"),
+      vertexNormal: gl.getAttribLocation(shaderProgram, "aVertexNormal"),
       textureCoord: gl.getAttribLocation(shaderProgram, "aTextureCoord"),
     },
     uniformLocations: {
@@ -509,6 +528,7 @@ function main() {
         "uProjectionMatrix",
       ),
       modelViewMatrix: gl.getUniformLocation(shaderProgram, "uModelViewMatrix"),
+      normalMatrix: gl.getUniformLocation(shaderProgram, "uNormalMatrix"),
       uSampler: gl.getUniformLocation(shaderProgram, "uSampler"),
     },
   };
@@ -537,6 +557,16 @@ function main() {
       gl,
       1,
       [{ X: 0, Y: -5001, Z: 0, size: 10000 }],
+      true,
+      gl.STATIC_DRAW,
+      true,
+    )[0],
+  );
+  cubeBuffers.push(
+    initManyCubeBuffers(
+      gl,
+      1,
+      [{ X: -1000, Y: 1000, Z: -2000, size: 100 }],
       true,
       gl.STATIC_DRAW,
       true,

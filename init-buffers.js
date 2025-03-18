@@ -5,8 +5,11 @@ function initBuffers(gl, obj, usage) {
 
   const indexBuffer = initIndexBuffer(gl);
 
+  const normalBuffer = initNormalBuffer(gl);
+
   return {
     position: positionBuffer,
+    normal: normalBuffer,
     textureCoord: textureCoordBuffer,
     indices: indexBuffer,
   };
@@ -21,14 +24,16 @@ function initManyCubeBuffers(
   alternatecolors = false,
 ) {
   const buffers = [];
-  //const colorBuffer = initColorBuffer(gl);
-  //const indexBuffer = initIndexBuffer(gl);
+  const indexBuffer = initIndexBuffer(gl);
+  const normalBuffer = initNormalBuffer(gl);
+  const textureCoordBuffer = initTextureBuffer(gl);
   for (let i = 0; i < numCubes; i++) {
     buffers.push({
       position: initPositionBuffer(gl, buildPositionsCube(objs[i]), usage),
-      color: initColorBuffer(gl, alternatecolors),
-      textureCoord: initTextureBuffer(gl),
-      indices: initIndexBuffer(gl),
+      //color: initColorBuffer(gl, alternatecolors),
+      normal: normalBuffer,
+      textureCoord: textureCoordBuffer,
+      indices: indexBuffer,
       permanent,
     });
   }
@@ -215,6 +220,39 @@ function initTextureBuffer(gl) {
   );
 
   return textureCoordBuffer;
+}
+
+function initNormalBuffer(gl) {
+  const normalBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+
+  const vertexNormals = [
+    // Front
+    0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0,
+
+    // Back
+    0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0,
+
+    // Top
+    0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0,
+
+    // Bottom
+    0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0,
+
+    // Right
+    1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+
+    // Left
+    -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0,
+  ];
+
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new Float32Array(vertexNormals),
+    gl.STATIC_DRAW,
+  );
+
+  return normalBuffer;
 }
 
 function buildPositionsCube(obj = { X: 0, Y: 0, Z: 0, size: 2 }) {
