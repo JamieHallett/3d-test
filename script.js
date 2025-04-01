@@ -89,7 +89,7 @@ document.addEventListener("keydown", (event) => {
       break;
     case "z":
       camera.fov = 10;
-      camera.moveSens = 0.001;
+      camera.moveSens = 0.0005;
       break;
     case "v":
       setFiring(true);
@@ -120,12 +120,33 @@ document.addEventListener("keyup", (event) => {
     case "f":
       keyStatus.f = false;
       break;
+
     case "z":
       camera.fov = 90;
-      camera.moveSens = 0.01;
+      camera.moveSens = 0.005;
       break;
     case "v":
       setFiring(false);
+      break;
+
+    case "t":
+      artillery = {};
+      break;
+    case ",":
+      const gl = canvas.getContext("webgl", {
+        powerPreference: "high-performance",
+      });
+      new Player(
+        1,
+        "player",
+        initManyCubeBuffers(
+          gl,
+          1,
+          Object.assign({}, { size: 1 }),
+          true,
+          gl.DYNAMIC_DRAW,
+        )[0],
+      );
       break;
 
     case "1":
@@ -155,13 +176,29 @@ document.addEventListener("keyup", (event) => {
   }
 });
 
+document.addEventListener("fullscreenchange", (event) => {
+  console.log("fullscreen changed");
+  const gl = canvas.getContext("webgl", {
+    powerPreference: "high-performance",
+  });
+  if (document.fullscreenElement) {
+    canvas.style.width = screen.width + "px";
+    canvas.style.height = screen.height + "px";
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  } else {
+    canvas.style.width = "640px";
+    canvas.style.height = "480px";
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+});
+
 const canvas = document.querySelector("#canvas");
 
 canvas.addEventListener("click", async () => {
   await canvas.requestPointerLock({
     unadjustedMovement: true,
   });
-  document.querySelector("#canvascontainer").requestFullscreen()
+  document.querySelector("#canvascontainer").requestFullscreen();
 });
 
 canvas.addEventListener("mousemove", (event) => {
@@ -175,6 +212,31 @@ canvas.addEventListener("mousemove", (event) => {
     }
   }
 });
+
+class Player {
+  constructor(id, name, buffers) {
+    this.type = "player";
+    this.id = id;
+    this.name = name;
+    this.score = 0;
+    this.hp = 100;
+    this.X = -10;
+    this.Y = 0;
+    this.Z = -10;
+    this.size = 1;
+    this.color = "#000000";
+    players[id] = this;
+    this.buffers = buffers;
+  }
+  disconnect() {
+    delete players[this.id];
+  }
+  respawn() {
+    this.hp = 100;
+    this.X = Math.random() * 1000 - 500;
+    this.Y = Math.random() * 1000 - 500;
+  }
+}
 
 class Projectile {
   constructor(
@@ -220,7 +282,7 @@ const camera = {
     return [this.horizRotation, this.vertRotation];
   },
   fov: 90,
-  moveSens: 0.01,
+  moveSens: 0.005,
 };
 let projectileID = 0;
 let artillery = {};
@@ -278,7 +340,7 @@ const weapons = {
     interval: 240,
     dmg: 1000,
     dmgrange: { start: 25, end: 75, endval: 20 },
-    vel: 10,
+    vel: 23,
     auto: false,
     inacc: 0,
     projecMult: 1,
@@ -288,7 +350,7 @@ const weapons = {
     interval: 10,
     dmg: 1,
     dmgrange: { start: 25, end: 75, endval: 20 },
-    vel: 10,
+    vel: 23,
     auto: false,
     inacc: 0,
     projecMult: 1,
@@ -582,6 +644,7 @@ function main() {
   let then = 0;
 
   setInterval(loop, 1 / loopfreq);
+  /*
   makeWorker(
     () => {
       onmessage = (e) => {
@@ -654,21 +717,28 @@ function main() {
     },
     "projectilemove",
   );
+  */
 
   // Draw the scene repeatedly
   function render(now) {
+    now *= 0.001; // convert to seconds
+    deltaTime = now - then;
+    then = now;
+
+    cameraMove(deltaTime);
+
+    // hold m to skip rendering
     if (keyStatus.m) {
       requestAnimationFrame(render);
       return;
     }
-    now *= 0.001; // convert to seconds
-    deltaTime = now - then;
-    then = now;
 
     frametime.innerText = `${(deltaTime * 1000).toFixed(2)}ms, ${(1 / deltaTime).toFixed(1)}fps`;
 
     const projecArray = updateManyCubeBuffers(gl, Object.values(artillery));
     const projectileBuffers = projecArray.map((projec) => projec.buffers);
+    const playerArray = updateManyCubeBuffers(gl, Object.values(players));
+    const playerBuffers = playerArray.map((player) => player.buffers);
     /* 
     initManyCubeBuffers(
       gl,
@@ -679,7 +749,7 @@ function main() {
     );
     */
 
-    const bufferArray = cubeBuffers.concat(projectileBuffers);
+    const bufferArray = cubeBuffers.concat(projectileBuffers, playerBuffers);
 
     if (keyStatus.b) {
       console.log(bufferArray, projecArray); ////////////////
@@ -711,14 +781,14 @@ function loop() {
   if (keyStatus.n) {
     return;
   }
-  cameraMove();
+  //cameraMove(1/loopfreq);
   //workers["projectilemove"].postMessage({ artillery, loopfreq });
   artillery = projectilemove(artillery, loopfreq);
   document.querySelector("#projecCount").innerText =
     Object.keys(artillery).length;
 }
 
-function cameraMove() {
+function cameraMove(speedmod) {
   const horizontal = keyStatus.a - keyStatus.d; // taking advantage of the fact that true == 1 and false == 0
   const vertical = keyStatus.w - keyStatus.s;
   const z = keyStatus.f - keyStatus.r;
@@ -726,9 +796,11 @@ function cameraMove() {
   const horizRotation = keyStatus.arrowright - keyStatus.arrowleft;
   const vertRotation = keyStatus.arrowdown - keyStatus.arrowup;
 
-  let speed = 0.1;
+  let speed = 10;
 
   speed /= Math.sqrt(Math.abs(horizontal) + Math.abs(vertical) + Math.abs(z));
+
+  speed *= speedmod;
 
   if (horizontal || vertical || z) {
     camera.X -=
@@ -802,7 +874,7 @@ function makeprojectile(
     const perpendicularY = velX;
     const len = weapon.projecMult;
     for (let i = 0; i < len; i++) {
-      // to be implemented for 3d version ///////////////////////////////////////////////////////////////////////////////////////////////
+      return; // to be implemented for 3d version ///////////////////////////////////////////////////////////////////////////////////////////////
       // there can only be multiple projectiles if there is an inaccuracy, because it would just act as 1 projectile if 100% accurate
       const random = Math.random();
       randomlist.push(random); // add to randomlist to send to server
@@ -831,7 +903,7 @@ function makeprojectile(
       initManyCubeBuffers(
         gl,
         1,
-        Object.assign({}, origin, [{ size: 0.1 }]),
+        Object.assign({}, origin, { size: 0.1 }),
         true,
         gl.DYNAMIC_DRAW,
       )[0],
@@ -936,36 +1008,90 @@ function collisionPredict(obj1, obj2) {
   // here obj1 is always a point, and obj2 is assumed to be stationary
   const diffX = obj1.X - obj2.X;
   const diffY = obj1.Y - obj2.Y;
-  const dist = Math.sqrt(diffX * diffX + diffY * diffY);
+  const diffZ = obj1.Z - obj2.Z;
 
+  // if objects are already colliding, return true
   if (collision(obj1, obj2, true)) {
     return true;
-  } // if objects are already colliding, return true
+  }
 
-  const spd = Math.sqrt(obj1.Xvel * obj1.Xvel + obj1.Yvel * obj1.Yvel);
+  const horizdist = Math.sqrt(diffX ** 2 + diffY ** 2);
+  const dist = Math.sqrt(diffX ** 2 + diffY ** 2 + diffZ ** 2);
+  const spd = Math.sqrt(obj1.vel[0] ** 2 + obj1.vel[1] ** 2 + obj1.vel[2] ** 2);
 
-  if (dist > spd) {
+  // if obj1 cannot reach obj2 in time, return false
+  if (dist > spd / loopfreq) {
     return false;
-  } // if obj1 cannot reach obj2 in time, return false
+  }
 
   const corners = [
-    { X: diffX - obj2.size / 2, Y: diffY - obj2.size / 2 },
-    { X: diffX + obj2.size / 2, Y: diffY - obj2.size / 2 },
-    { X: diffX - obj2.size / 2, Y: diffY + obj2.size / 2 },
-    { X: diffX + obj2.size / 2, Y: diffY + obj2.size / 2 },
+    {
+      X: diffX - obj2.size / 2,
+      Y: diffY - obj2.size / 2,
+      Z: diffZ - obj2.size / 2,
+    },
+    {
+      X: diffX + obj2.size / 2,
+      Y: diffY - obj2.size / 2,
+      Z: diffZ - obj2.size / 2,
+    },
+    {
+      X: diffX - obj2.size / 2,
+      Y: diffY + obj2.size / 2,
+      Z: diffZ - obj2.size / 2,
+    },
+    {
+      X: diffX + obj2.size / 2,
+      Y: diffY + obj2.size / 2,
+      Z: diffZ - obj2.size / 2,
+    },
+    {
+      X: diffX - obj2.size / 2,
+      Y: diffY - obj2.size / 2,
+      Z: diffZ + obj2.size / 2,
+    },
+    {
+      X: diffX + obj2.size / 2,
+      Y: diffY - obj2.size / 2,
+      Z: diffZ + obj2.size / 2,
+    },
+    {
+      X: diffX - obj2.size / 2,
+      Y: diffY + obj2.size / 2,
+      Z: diffZ + obj2.size / 2,
+    },
+    {
+      X: diffX + obj2.size / 2,
+      Y: diffY + obj2.size / 2,
+      Z: diffZ + obj2.size / 2,
+    },
   ];
 
-  const notaDotProduct = [];
+  const notDotProducts = [[], [], []];
 
+  // this calculates if velocity vector is clockwise or counterclockwise from the corner vector (not a dot product)
   for (let i = 0; i < 4; i++) {
-    notaDotProduct.push(
-      Math.sign(corners[i].X * obj1.Yvel - corners[i].Y * obj1.Xvel),
+    notDotProducts[0].push(
+      Math.sign(corners[i].X * obj1.vel[2] - corners[i].Y * obj1.vel[0]),
     );
-  } // this calculates if velocity vector is clockwise or counterclockwise from the corner vector (not a dot product)
+  }
+  for (let i = 0; i < 8; i += 2) {
+    notDotProducts[1].push(
+      Math.sign(corners[i].Y * obj1.vel[1] - corners[i].Z * obj1.vel[2]),
+    );
+  }
+  for (const i of [0, 1, 4, 5]) {
+    notDotProducts[2].push(
+      Math.sign(corners[i].Z * obj1.vel[0] - corners[i].X * obj1.vel[1]),
+    );
+  }
 
-  if (new Set(notaDotProduct).size > 1) {
-    return true;
-  } // if corner angles are only clockwise or only counterclockwise of velocity vector, return true
-
-  return false; // if the above did not return true
+  for (let i = 0; i < 3; i++) {
+    // if corner angles are only clockwise or only counterclockwise of velocity vector, return false
+    if (new Set(notDotProducts[i]).size <= 1) {
+      console.log("wrong direction", notDotProducts[i], i);
+      return false;
+    }
+  }
+  return true; // if velocity vector goes in between all corners, it will collide with the object
 }

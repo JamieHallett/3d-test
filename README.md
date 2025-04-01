@@ -9,3 +9,5 @@ i mostly just made this for github pages https://jamiehallett.github.io/3d-test
 - click on 3d stuff and move mouse: move camera
 - arrow keys: move camera
 - z: zoom
+
+![the texture i used for the cubes](/square.svg)
