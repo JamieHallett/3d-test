@@ -87,9 +87,14 @@ document.addEventListener("keydown", (event) => {
     case "f":
       keyStatus.f = true;
       break;
+      
     case "z":
       camera.fov = 10;
       camera.moveSens = 0.0005;
+      break;
+    case "x":
+      camera.fov = 1;
+      camera.moveSens = 0.00005;
       break;
     case "v":
       setFiring(true);
@@ -166,6 +171,9 @@ document.addEventListener("keyup", (event) => {
       break;
     case "6":
       weapons.code = "fasttest";
+      break;
+    case "7":
+      weapons.code = "squareofcubes";
       break;
 
     default:
@@ -355,6 +363,16 @@ const weapons = {
     inacc: 0,
     projecMult: 1,
   },
+  squareofcubes: {
+    rate: 2,
+    interval: 500,
+    dmg: 1,
+    dmgrange: { start: 25, end: 75, endval: 20 },
+    vel: 100,
+    auto: false,
+    inacc: 0.005,
+    projecMult: 100,
+  },
 };
 
 //
@@ -451,6 +469,13 @@ function makeSimpleTexture(gl) {
 function isPowerOf2(value) {
   return (value & (value - 1)) === 0;
 }
+
+const projecTexture = loadTexture(
+  canvas.getContext("webgl", {
+    powerPreference: "high-performance",
+  }),
+  "projectile.svg",
+);
 
 function main() {
   /* more stuff 
@@ -595,6 +620,12 @@ function main() {
     },
   };
 
+  // Load texture
+  const texture = loadTexture(gl, "square.svg");
+  // const floortexture = loadTexture(gl, "square.svg");
+  // Flip image pixels into the bottom-to-top order that WebGL expects.
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
   // Here's where we call the routine that builds all the
   // objects we'll be drawing.
   const buffers = initBuffers(gl, buildPositionsCube());
@@ -613,6 +644,7 @@ function main() {
     ],
     true,
     gl.STATIC_DRAW,
+    texture,
   );
   cubeBuffers.push(
     initManyCubeBuffers(
@@ -621,7 +653,7 @@ function main() {
       [{ X: 0, Y: -5001, Z: 0, size: 10000 }],
       true,
       gl.STATIC_DRAW,
-      true,
+      texture,
     )[0],
   );
   cubeBuffers.push(
@@ -631,15 +663,9 @@ function main() {
       [{ X: -1000, Y: 1000, Z: -2000, size: 100 }],
       true,
       gl.STATIC_DRAW,
-      true,
+      texture,
     )[0],
   );
-
-  // Load texture
-  const texture = loadTexture(gl, "square.svg");
-  const floortexture = loadTexture(gl, "square.svg");
-  // Flip image pixels into the bottom-to-top order that WebGL expects.
-  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
   let then = 0;
 
@@ -870,18 +896,47 @@ function makeprojectile(
   const velZ = weapon.vel * sin_phi;
   const randomlist = []; // random numbers used for randomising projectile inaccuracy saved here
   if (weapon.inacc != 0) {
-    const perpendicularX = -velY;
-    const perpendicularY = velX;
+    const perpendicular_vert = [
+      weapon.vel * -sin_theta * sin_phi, //sin_theta*sin_phi,// * -velZ,
+      weapon.vel * -cos_theta * sin_phi, //cos_theta*sin_phi,// * -velZ,
+      -Math.sqrt(velX ** 2 + velY ** 2),
+    ]; // [x, y, z]
+    const perpendicularHoriz = [
+      cos_theta * weapon.vel,
+      -sin_theta * weapon.vel,
+    ]; // [x,y]
     const len = weapon.projecMult;
     for (let i = 0; i < len; i++) {
-      return; // to be implemented for 3d version ///////////////////////////////////////////////////////////////////////////////////////////////
       // there can only be multiple projectiles if there is an inaccuracy, because it would just act as 1 projectile if 100% accurate
-      const random = Math.random();
-      randomlist.push(random); // add to randomlist to send to server
-      const randomInacc = random * weapon.inacc * 2 - weapon.inacc;
+      const randomVert = Math.random();
+      const randomHoriz = Math.random();
+      randomlist.push(randomVert, randomHoriz); // add to randomlist to send to server (if multiplayer)
+      const randomInaccVert = randomVert * weapon.inacc * 2 - weapon.inacc;
+      const randomInaccHoriz = randomHoriz * weapon.inacc * 2 - weapon.inacc;
+
+      console.log([
+        velX +
+          perpendicularHoriz[0] * randomInaccHoriz +
+          perpendicular_vert[0] * randomInaccVert,
+        velY +
+          perpendicularHoriz[1] * randomInaccHoriz +
+          perpendicular_vert[1] * randomInaccVert,
+        velZ + perpendicular_vert[2] * randomInaccVert,
+      ]);
+
       new Projectile(
         origin,
-        [velX, velY, velZ],
+        [
+          velX +
+            perpendicularHoriz[0] * randomInaccHoriz +
+            perpendicular_vert[0] * randomInaccVert
+          ,
+          velY +
+            perpendicularHoriz[1] * randomInaccHoriz +
+            perpendicular_vert[1] * randomInaccVert
+          ,
+          velZ + perpendicular_vert[2] * randomInaccVert,
+        ],
         0.1,
         weapon.dmg,
         initManyCubeBuffers(
@@ -890,6 +945,7 @@ function makeprojectile(
           Object.assign({}, origin, [{ size: 0.1 }]),
           true,
           gl.DYNAMIC_DRAW,
+          projecTexture,
         )[0],
       );
     }
@@ -906,6 +962,7 @@ function makeprojectile(
         Object.assign({}, origin, { size: 0.1 }),
         true,
         gl.DYNAMIC_DRAW,
+        projecTexture,
       )[0],
     );
   }
@@ -976,7 +1033,7 @@ function projectilemove(artillery, loopfreq) {
 function collision(obj1, obj2, obj1IsPoint = false) {
   const diffX = obj1.X - obj2.X;
   const diffY = obj1.Y - obj2.Y;
-  const dist = Math.sqrt(diffX * diffX + diffY * diffY);
+  const dist = Math.sqrt(diffX ** 2 + diffY ** 2);
   if (dist > obj1.size + obj2.size) {
     return false;
   } // return if objects are way too far for collision
@@ -1015,7 +1072,7 @@ function collisionPredict(obj1, obj2) {
     return true;
   }
 
-  const horizdist = Math.sqrt(diffX ** 2 + diffY ** 2);
+  //const horizdist = Math.sqrt(diffX ** 2 + diffY ** 2);
   const dist = Math.sqrt(diffX ** 2 + diffY ** 2 + diffZ ** 2);
   const spd = Math.sqrt(obj1.vel[0] ** 2 + obj1.vel[1] ** 2 + obj1.vel[2] ** 2);
 

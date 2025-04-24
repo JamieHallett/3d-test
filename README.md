@@ -10,4 +10,4 @@ i mostly just made this for github pages https://jamiehallett.github.io/3d-test
 - arrow keys: move camera
 - z: zoom
 
-![the texture i used for the cubes](/square.svg)
+![the image i used for the cubes' textures](/square.svg)

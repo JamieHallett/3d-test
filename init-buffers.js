@@ -21,7 +21,7 @@ function initManyCubeBuffers(
   objs = [{ X: 0, Y: 0, Z: 0, size: 2 }],
   permanent = false,
   usage = gl.STATIC_DRAW,
-  alternatecolors = false,
+  texture,
 ) {
   const buffers = [];
   const indexBuffer = initIndexBuffer(gl);
@@ -35,6 +35,7 @@ function initManyCubeBuffers(
       textureCoord: textureCoordBuffer,
       indices: indexBuffer,
       permanent,
+      texture,
     });
   }
   return buffers;
