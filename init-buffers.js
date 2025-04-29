@@ -56,6 +56,7 @@ function updateManyCubeBuffers(
     },
   ],
   camerapos = [0, 0, 0],
+  fov = 90,
 ) {
   const newobjs = [];
   const len = objs.length;
@@ -69,13 +70,18 @@ function updateManyCubeBuffers(
       buildPositionsCube(
         obj.buffers.highvisibility // high visibility makes objects render larger when further away to make them easier to see or to give the appearance of glowing
           ? Object.assign({}, obj, {
-              size:
-                Math.pow(
+              size: Math.max(
+                (Math.pow(
                   (camerapos[0] - objpos[0]) ** 2 +
                     (camerapos[1] - objpos[1]) ** 2 +
                     (camerapos[2] - objpos[2]) ** 2,
                   0.25,
-                ) * obj.size,
+                ) *
+                  obj.size *
+                  fov) /
+                  45,
+                obj.size,
+              ),
             })
           : obj,
       ),

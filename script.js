@@ -752,7 +752,7 @@ function main() {
     deltaTime = now - then;
     then = now;
 
-    cameraMove(deltaTime);
+    cameraMove(deltaTime * (keyStatus.shift ? 10 : 1));
 
     // hold m to skip rendering
     if (keyStatus.m) {
@@ -766,12 +766,14 @@ function main() {
       gl,
       Object.values(artillery),
       camera.getPos(),
+      camera.fov,
     );
     const projectileBuffers = projecArray.map((projec) => projec.buffers);
     const playerArray = updateManyCubeBuffers(
       gl,
       Object.values(players),
       camera.getPos(),
+      camera.fov,
     );
     const playerBuffers = playerArray.map((player) => player.buffers);
     /* 
