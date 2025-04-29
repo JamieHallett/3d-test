@@ -87,7 +87,7 @@ document.addEventListener("keydown", (event) => {
     case "f":
       keyStatus.f = true;
       break;
-      
+
     case "z":
       camera.fov = 10;
       camera.moveSens = 0.0005;
@@ -222,16 +222,16 @@ canvas.addEventListener("mousemove", (event) => {
 });
 
 class Player {
-  constructor(id, name, buffers) {
+  constructor(id, name, buffers, size = 1, x = -10, y = 0, z = -10) {
     this.type = "player";
     this.id = id;
     this.name = name;
     this.score = 0;
     this.hp = 100;
-    this.X = -10;
-    this.Y = 0;
-    this.Z = -10;
-    this.size = 1;
+    this.X = x;
+    this.Y = y;
+    this.Z = z;
+    this.size = size;
     this.color = "#000000";
     players[id] = this;
     this.buffers = buffers;
@@ -260,6 +260,7 @@ class Projectile {
     this.X = origin.X;
     this.Y = origin.Y;
     this.Z = origin.Z;
+    this.getPos = () => [this.X, this.Y, this.Z];
     this.vel = vel;
     this.size = size;
     this.dmg = dmg;
@@ -761,9 +762,17 @@ function main() {
 
     frametime.innerText = `${(deltaTime * 1000).toFixed(2)}ms, ${(1 / deltaTime).toFixed(1)}fps`;
 
-    const projecArray = updateManyCubeBuffers(gl, Object.values(artillery));
+    const projecArray = updateManyCubeBuffers(
+      gl,
+      Object.values(artillery),
+      camera.getPos(),
+    );
     const projectileBuffers = projecArray.map((projec) => projec.buffers);
-    const playerArray = updateManyCubeBuffers(gl, Object.values(players));
+    const playerArray = updateManyCubeBuffers(
+      gl,
+      Object.values(players),
+      camera.getPos(),
+    );
     const playerBuffers = playerArray.map((player) => player.buffers);
     /* 
     initManyCubeBuffers(
@@ -929,12 +938,10 @@ function makeprojectile(
         [
           velX +
             perpendicularHoriz[0] * randomInaccHoriz +
-            perpendicular_vert[0] * randomInaccVert
-          ,
+            perpendicular_vert[0] * randomInaccVert,
           velY +
             perpendicularHoriz[1] * randomInaccHoriz +
-            perpendicular_vert[1] * randomInaccVert
-          ,
+            perpendicular_vert[1] * randomInaccVert,
           velZ + perpendicular_vert[2] * randomInaccVert,
         ],
         0.1,
@@ -946,6 +953,7 @@ function makeprojectile(
           true,
           gl.DYNAMIC_DRAW,
           projecTexture,
+          true, // projectiles are high visibility
         )[0],
       );
     }
@@ -963,6 +971,7 @@ function makeprojectile(
         true,
         gl.DYNAMIC_DRAW,
         projecTexture,
+        true, // projectiles are high visibility
       )[0],
     );
   }

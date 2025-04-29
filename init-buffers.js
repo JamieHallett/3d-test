@@ -22,6 +22,7 @@ function initManyCubeBuffers(
   permanent = false,
   usage = gl.STATIC_DRAW,
   texture,
+  highvisibility = false,
 ) {
   const buffers = [];
   const indexBuffer = initIndexBuffer(gl);
@@ -36,6 +37,7 @@ function initManyCubeBuffers(
       indices: indexBuffer,
       permanent,
       texture,
+      highvisibility,
     });
   }
   return buffers;
@@ -43,16 +45,40 @@ function initManyCubeBuffers(
 
 function updateManyCubeBuffers(
   gl,
-  objs = [{ X: 0, Y: 0, Z: 0, size: 2, buffers: {} }],
+  objs = [
+    {
+      X: 0,
+      Y: 0,
+      Z: 0,
+      getPos: () => [this.X, this.Y, this.Z],
+      size: 2,
+      buffers: {},
+    },
+  ],
+  camerapos = [0, 0, 0],
 ) {
   const newobjs = [];
   const len = objs.length;
   for (let i = 0; i < len; i++) {
-    newobjs.push(Object.assign({}, objs[i]));
+    const obj = objs[i];
+    const objpos = obj.getPos ? obj.getPos() : [obj.X, obj.Y, obj.Z];
+    newobjs.push(Object.assign({}, obj));
     newobjs[i].buffers.position = updatePositionBuffer(
       gl,
-      objs[i].buffers.position,
-      buildPositionsCube(objs[i]),
+      obj.buffers.position,
+      buildPositionsCube(
+        obj.buffers.highvisibility // high visibility makes objects render larger when further away to make them easier to see or to give the appearance of glowing
+          ? Object.assign({}, obj, {
+              size:
+                Math.pow(
+                  (camerapos[0] - objpos[0]) ** 2 +
+                    (camerapos[1] - objpos[1]) ** 2 +
+                    (camerapos[2] - objpos[2]) ** 2,
+                  0.25,
+                ) * obj.size,
+            })
+          : obj,
+      ),
     );
   }
   return newobjs;
