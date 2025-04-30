@@ -5,6 +5,7 @@ i mostly just made this for github pages https://jamiehallett.github.io/3d-test
 ## controls
 - wasd: movement
 - r + f: move up/down
+- shift: move 10x faster
 - v: make projectile
 - 1-7 keys: switch weapon (projectiles have different characteristics)
 - click on 3d stuff and move mouse: move camera (you may have to click multiple times)
