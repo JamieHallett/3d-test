@@ -5,7 +5,6 @@ function drawScene(
   cameraRot = [0.0, 0.0],
   cameraPos = [0.0, 0.0, -3.0],
   bufferArray,
-  texture,
 ) {
   gl.clearColor(0.0, 0.0, 0.0, 1.0); // Clear to black, fully opaque
   gl.clearDepth(1.0); // Clear everything
@@ -26,7 +25,7 @@ function drawScene(
   const fieldOfView = (fov * Math.PI) / 180; // in radians
   const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
   const zNear = 0.1;
-  const zFar = 100000.0;
+  const zFar = 100_000.0;
   const projectionMatrix = mat4.create();
 
   // note: glMatrix always has the first argument
@@ -71,7 +70,6 @@ function drawScene(
       bufferArray[i],
       projectionMatrix,
       modelViewMatrix,
-      texture,
       normalMatrix,
     );
   }
@@ -83,7 +81,6 @@ function drawElem(
   buffers,
   projectionMatrix,
   modelViewMatrix,
-  texture,
   normalMatrix,
 ) {
   // Tell WebGL how to pull out the positions from the position
@@ -117,7 +114,6 @@ function drawElem(
     normalMatrix,
   );
 
-  
   // Tell WebGL we want to affect texture unit 0
   gl.activeTexture(gl.TEXTURE0);
 
@@ -126,7 +122,6 @@ function drawElem(
 
   // Tell the shader we bound the texture to texture unit 0
   gl.uniform1i(programInfo.uniformLocations.uSampler, 0);
-
 
   {
     const vertexCount = 36;

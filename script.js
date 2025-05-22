@@ -17,11 +17,21 @@ const keyStatus = {
   d: false,
   r: false,
   f: false,
+  z: false,
+  h: false,
   arrowup: false,
   arrowdown: false,
   arrowleft: false,
   arrowright: false,
 };
+
+const canvas = document.querySelector("#canvas");
+
+// Initialize the GL context
+const gl = canvas.getContext("webgl", {
+  powerPreference: "high-performance",
+});
+console.log(gl.getContextAttributes());
 
 function button() {
   fetch("text.txt")
@@ -99,6 +109,9 @@ document.addEventListener("keydown", (event) => {
     case "v":
       setFiring(true);
       break;
+    case "g":
+      makeprojectile(projecCannon);
+      break;
 
     default:
       keyStatus[event.key.toLowerCase()] = true;
@@ -133,6 +146,13 @@ document.addEventListener("keyup", (event) => {
     case "v":
       setFiring(false);
       break;
+    case "h":
+      console.log(camera.getRot());
+      keyStatus.h = false;
+      break;
+    case "j":
+      camera.invertMouse = !camera.invertMouse;
+      break;
 
     case "t":
       artillery = {};
@@ -142,7 +162,7 @@ document.addEventListener("keyup", (event) => {
         powerPreference: "high-performance",
       });
       new Player(
-        1,
+        undefined,
         "player",
         initManyCubeBuffers(
           gl,
@@ -150,7 +170,12 @@ document.addEventListener("keyup", (event) => {
           Object.assign({}, { size: 1 }),
           true,
           gl.DYNAMIC_DRAW,
+          texture,
         )[0],
+        1,
+        -10 - playerID * 1.5,
+        0,
+        -10,
       );
       break;
 
@@ -175,6 +200,12 @@ document.addEventListener("keyup", (event) => {
     case "7":
       weapons.code = "squareofcubes";
       break;
+    case "8":
+      weapons.code = "cbutinaccurate";
+      break;
+    case "9":
+      weapons.code = "fountain";
+      break;
 
     default:
       //console.log("other key pressed:", event.key);
@@ -185,46 +216,47 @@ document.addEventListener("keyup", (event) => {
 });
 
 document.addEventListener("fullscreenchange", (event) => {
-  console.log("fullscreen changed");
-  const gl = canvas.getContext("webgl", {
-    powerPreference: "high-performance",
-  });
+  console.log("fullscreen changed, your position:", camera.getPos());
   if (document.fullscreenElement) {
     canvas.style.width = screen.width + "px";
     canvas.style.height = screen.height + "px";
-    gl.viewport(0, 0, canvas.width, canvas.height);
+    //gl.viewport(0, 0, screen.width, screen.height);
   } else {
     canvas.style.width = "640px";
     canvas.style.height = "480px";
-    gl.viewport(0, 0, canvas.width, canvas.height);
+    //gl.viewport(0, 0, 640, 480);
   }
 });
-
-const canvas = document.querySelector("#canvas");
 
 canvas.addEventListener("click", async () => {
   await canvas.requestPointerLock({
     unadjustedMovement: true,
   });
-  document.querySelector("#canvascontainer").requestFullscreen();
+  if (document.querySelector("#enableFullscreen").checked) {
+    document.querySelector("#canvascontainer").requestFullscreen();
+  }
 });
 
 canvas.addEventListener("mousemove", (event) => {
+  // hold h to rotate the projectile cannon instead of the camera
+  const obj = keyStatus.h ? projecCannon : camera;
+  // press j to toggle invert rotation
+  const horizModifier = camera.invertMouse ? -1 : 1;
   if (document.pointerLockElement === canvas) {
-    camera.horizRotation -= event.movementX * camera.moveSens;
-    camera.vertRotation -= event.movementY * camera.moveSens;
-    if (camera.vertRotation > Math.PI / 2) {
-      camera.vertRotation = Math.PI / 2;
-    } else if (camera.vertRotation < -Math.PI / 2) {
-      camera.vertRotation = -Math.PI / 2;
+    obj.horizRotation -= event.movementX * camera.moveSens * horizModifier;
+    obj.vertRotation -= event.movementY * camera.moveSens;
+    if (obj.vertRotation > Math.PI / 2) {
+      obj.vertRotation = Math.PI / 2;
+    } else if (obj.vertRotation < -Math.PI / 2) {
+      obj.vertRotation = -Math.PI / 2;
     }
   }
 });
 
 class Player {
-  constructor(id, name, buffers, size = 1, x = -10, y = 0, z = -10) {
+  constructor(idOverride, name, buffers, size = 1, x = -10, y = 0, z = -10) {
     this.type = "player";
-    this.id = id;
+    this.id = idOverride || playerID++;
     this.name = name;
     this.score = 0;
     this.hp = 100;
@@ -233,7 +265,7 @@ class Player {
     this.Z = z;
     this.size = size;
     this.color = "#000000";
-    players[id] = this;
+    players[this.id] = this;
     this.buffers = buffers;
   }
   disconnect() {
@@ -242,7 +274,7 @@ class Player {
   respawn() {
     this.hp = 100;
     this.X = Math.random() * 1000 - 500;
-    this.Y = Math.random() * 1000 - 500;
+    this.Z = Math.random() * 1000 - 500;
   }
 }
 
@@ -273,8 +305,9 @@ class Projectile {
 
 const frametime = document.querySelector("#frametime");
 let cubeRotation = 0.0;
-let deltaTime = 0;
+let renderDeltaTime = 0;
 const loopfreq = 100; // measured in hz
+let loopThen = Date.now();
 const camera = {
   X: 5,
   Y: 5,
@@ -292,15 +325,45 @@ const camera = {
   },
   fov: 90,
   moveSens: 0.005,
+  invertMouse: false,
+};
+const projecCannon = {
+  // the cannon is on the origin-facing corner of the floating cube
+  X: -1000 + 50,
+  Y: 1000 - 50,
+  Z: -2000 + 50,
+  getPos() {
+    return [this.X, this.Y, this.Z];
+  },
+  /*
+  // rotation is inverse of the camera's rotation
+  get horizRotation() {
+    return camera.horizRotation + Math.PI;
+  },
+  get vertRotation() {
+    return -camera.vertRotation;
+  },
+  */
+  horizRotation: 0.4525 + Math.PI,
+  vertRotation: -0.3855,
+
+  getRot() {
+    return [this.horizRotation, this.vertRotation];
+  },
+  get rot() {
+    return [this.horizRotation, this.vertRotation];
+  },
+  firing: false,
 };
 let projectileID = 0;
+let playerID = 0;
 let artillery = {};
 const players = {};
 let firing = false;
 let canFire = true;
 let firingIntervalID = 0;
 const weapons = {
-  code: "slowtest", // this is the default weapon
+  code: "c", // this is the default weapon
   get current() {
     return weapons[weapons.code];
   },
@@ -373,6 +436,26 @@ const weapons = {
     auto: false,
     inacc: 0.005,
     projecMult: 100,
+  },
+  cbutinaccurate: {
+    rate: 13,
+    interval: 75,
+    dmg: 35,
+    dmgrange: { start: 50, end: 150, endval: 30 },
+    vel: 950,
+    auto: true,
+    inacc: 0.000_5,
+    projecMult: 1,
+  },
+  fountain: {
+    rate: 20,
+    interval: 50,
+    dmg: 100,
+    dmgrange: { start: 50, end: 150, endval: 30 },
+    vel: 75,
+    auto: true,
+    inacc: 0.5,
+    projecMult: 20,
   },
 };
 
@@ -471,6 +554,8 @@ function isPowerOf2(value) {
   return (value & (value - 1)) === 0;
 }
 
+// Load texture
+const texture = loadTexture(gl, "square.svg");
 const projecTexture = loadTexture(
   canvas.getContext("webgl", {
     powerPreference: "high-performance",
@@ -482,11 +567,10 @@ function main() {
   /* more stuff 
   https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Adding_2D_content_to_a_WebGL_context
   */
-  // Initialize the GL context
-  const gl = canvas.getContext("webgl", {
-    powerPreference: "high-performance",
-  });
-  console.log(gl.getContextAttributes());
+
+  // make canvas 480p
+  canvas.style.width = "640px";
+  canvas.style.height = "480px";
 
   // Set clear color to black, fully opaque
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
@@ -621,15 +705,15 @@ function main() {
     },
   };
 
-  // Load texture
-  const texture = loadTexture(gl, "square.svg");
   // const floortexture = loadTexture(gl, "square.svg");
   // Flip image pixels into the bottom-to-top order that WebGL expects.
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
   // Here's where we call the routine that builds all the
   // objects we'll be drawing.
-  const buffers = initBuffers(gl, buildPositionsCube());
+  //const buffers = initBuffers(gl, buildPositionsCube());
+
+  // build the interesting structure
   const cubeBuffers = initManyCubeBuffers(
     gl,
     8,
@@ -647,6 +731,8 @@ function main() {
     gl.STATIC_DRAW,
     texture,
   );
+
+  // build the floor cube
   cubeBuffers.push(
     initManyCubeBuffers(
       gl,
@@ -657,6 +743,8 @@ function main() {
       texture,
     )[0],
   );
+
+  // build the floating cube
   cubeBuffers.push(
     initManyCubeBuffers(
       gl,
@@ -670,71 +758,13 @@ function main() {
 
   let then = 0;
 
-  setInterval(loop, 1 / loopfreq);
+  setInterval(loop, 1000 / loopfreq);
   /*
   makeWorker(
     () => {
       onmessage = (e) => {
         function projectilemove(artillery, loopfreq) {
-          // also checks collision with players
-          const deletionList = [];
-          Object.values(artillery).forEach((projectile) => {
-            const collidedPlayers = [];
-            for (const player of Object.values(players)) {
-              // check all players for collision, add collided to array
-              if (collisionPredict(projectile, player)) {
-                // add player to collided if hit
-                collidedPlayers.push(player);
-              }
-            }
-            for (const i in collidedPlayers) {
-              // do not hit owner
-              if (collidedPlayers[i].id == projectile.ownerID) {
-                collidedPlayers.splice(i, 1);
-                break;
-              }
-            }
-
-            // if players are collided, continue
-            if (collidedPlayers.length > 0) {
-              deletionList.push(projectile.id); // schedule projectile for deletion
-              let closestTarget;
-              // see which target is closest
-              collidedPlayers.forEach((target) => {
-                // if first in the list, set it as the closest
-                if (closestTarget == undefined) {
-                  closestTarget = target;
-                  return;
-                }
-                // if closer, set as closest (for now)
-                if (
-                  Math.sqrt(
-                    (target.X - projectile.X) ** 2 +
-                      (target.Y - projectile.Y) ** 2,
-                  ) <
-                  Math.sqrt(
-                    (closestTarget.X - projectile.X) ** 2 +
-                      (closestTarget.Y - projectile.Y) ** 2,
-                  )
-                ) {
-                  closestTarget = target;
-                  return;
-                }
-              });
-            }
-
-            // do movement after collision check
-            projectile.X += projectile.vel[0] / loopfreq;
-            projectile.Y += projectile.vel[2] / loopfreq;
-            projectile.Z += projectile.vel[1] / loopfreq;
-
-            // do gravity
-            projectile.vel[2] -= 0.1;
-          });
-          deletionList.forEach((id) => {
-            delete artillery[id];
-          });
-          return artillery;
+          //projectilemove goes here (if workers are used)
         }
         postMessage(projectilemove(e.data.artillery, e.data.loopfreq));
       };
@@ -749,10 +779,10 @@ function main() {
   // Draw the scene repeatedly
   function render(now) {
     now *= 0.001; // convert to seconds
-    deltaTime = now - then;
+    renderDeltaTime = now - then;
     then = now;
 
-    cameraMove(deltaTime * (keyStatus.shift ? 10 : 1));
+    cameraMove(renderDeltaTime * (keyStatus.shift ? 10 : 1));
 
     // hold m to skip rendering
     if (keyStatus.m) {
@@ -760,7 +790,7 @@ function main() {
       return;
     }
 
-    frametime.innerText = `${(deltaTime * 1000).toFixed(2)}ms, ${(1 / deltaTime).toFixed(1)}fps`;
+    frametime.innerText = `${(renderDeltaTime * 1000).toFixed(2).padStart(6, " ")}ms, ${(1 / renderDeltaTime).toFixed(1).padStart(5, " ")}fps`;
 
     const projecArray = updateManyCubeBuffers(
       gl,
@@ -800,11 +830,10 @@ function main() {
       camera.getRot(),
       camera.getPos(),
       bufferArray,
-      texture,
     );
-    cubeRotation += deltaTime;
-    if (deltaTime > 0.03) {
-      console.log("frame drop", deltaTime);
+    cubeRotation += renderDeltaTime;
+    if (renderDeltaTime > 0.03) {
+      console.log("frame drop", renderDeltaTime);
     }
 
     requestAnimationFrame(render);
@@ -815,14 +844,24 @@ function main() {
 main();
 
 function loop() {
+  const now = Date.now();
+  const deltaTime = (now - loopThen) / 1000;
+  loopThen = now;
+
+  // hold n to skip loop
   if (keyStatus.n) {
     return;
   }
+
+  document.querySelector("#loopfreq").innerText =
+    `${(1 / deltaTime).toFixed(1).padStart(5, " ")}hz, ${(deltaTime * 1000).toFixed(2).padStart(5, " ")}ms`;
+
   //cameraMove(1/loopfreq);
   //workers["projectilemove"].postMessage({ artillery, loopfreq });
-  artillery = projectilemove(artillery, loopfreq);
-  document.querySelector("#projecCount").innerText =
-    Object.keys(artillery).length;
+  artillery = projectilemove(artillery, deltaTime);
+  document.querySelector("#projecCount").innerText = Object.keys(artillery)
+    .length.toFixed()
+    .padStart(4, " ");
 }
 
 function cameraMove(speedmod) {
@@ -980,14 +1019,14 @@ function makeprojectile(
   // console.log(artillery); /////////////////////////////////////////
 }
 
-function projectilemove(artillery, loopfreq) {
+function projectilemove(artillery, deltaTime) {
   // also checks collision with players
   const deletionList = [];
   Object.values(artillery).forEach((projectile) => {
     const collidedPlayers = [];
     for (const player of Object.values(players)) {
       // check all players for collision, add collided to array
-      if (collisionPredict(projectile, player)) {
+      if (collisionPredict(projectile, player, deltaTime)) {
         // add player to collided if hit
         collidedPlayers.push(player);
       }
@@ -1006,34 +1045,42 @@ function projectilemove(artillery, loopfreq) {
       let closestTarget;
       // see which target is closest
       collidedPlayers.forEach((target) => {
-        // if first in the list, set it as the closest
+        // if first in the list, set it as the closest for now
         if (closestTarget == undefined) {
           closestTarget = target;
           return;
         }
+
         // if closer, set as closest (for now)
         if (
-          Math.sqrt(
-            (target.X - projectile.X) ** 2 + (target.Y - projectile.Y) ** 2,
-          ) <
-          Math.sqrt(
-            (closestTarget.X - projectile.X) ** 2 +
-              (closestTarget.Y - projectile.Y) ** 2,
-          )
+          // no need to sqrt for distance because we can compare the squares of the distances
+          (target.X - projectile.X) ** 2 +
+            (target.Y - projectile.Y) ** 2 +
+            (target.Z - projectile.Z) ** 2 <
+          (closestTarget.X - projectile.X) ** 2 +
+            (closestTarget.Y - projectile.Y) ** 2 +
+            (closestTarget.Z - projectile.Z) ** 2
         ) {
           closestTarget = target;
           return;
         }
       });
+      // do damage to closest target
+      closestTarget.hp -= projectile.dmg;
+      console.log("hit player", closestTarget.id, "for", closestTarget.hp);
+      if (closestTarget.hp <= 0) {
+        // if player is dead, remove it
+        closestTarget.disconnect();
+      }
     }
 
     // do movement after collision check
-    projectile.X += projectile.vel[0] / loopfreq;
-    projectile.Y += projectile.vel[2] / loopfreq;
-    projectile.Z += projectile.vel[1] / loopfreq;
+    projectile.X += projectile.vel[0] * deltaTime;
+    projectile.Y += projectile.vel[2] * deltaTime;
+    projectile.Z += projectile.vel[1] * deltaTime;
 
     // do gravity
-    projectile.vel[2] -= 0.1;
+    projectile.vel[2] -= 10 * deltaTime;
   });
   deletionList.forEach((id) => {
     delete artillery[id];
@@ -1072,7 +1119,7 @@ function collision(obj1, obj2, obj1IsPoint = false) {
   return false;
 }
 
-function collisionPredict(obj1, obj2) {
+function collisionPredict(obj1, obj2, deltaTime) {
   // here obj1 is always a point, and obj2 is assumed to be stationary
   const diffX = obj1.X - obj2.X;
   const diffY = obj1.Y - obj2.Y;
@@ -1088,7 +1135,7 @@ function collisionPredict(obj1, obj2) {
   const spd = Math.sqrt(obj1.vel[0] ** 2 + obj1.vel[1] ** 2 + obj1.vel[2] ** 2);
 
   // if obj1 cannot reach obj2 in time, return false
-  if (dist > spd / loopfreq) {
+  if (dist > spd * deltaTime) {
     return false;
   }
 

@@ -12,7 +12,7 @@
       <stop offset="100%" stop-color="yellow" />
     </linearGradient>
   </defs>
-  <rect fill="url(#grad1)" stroke="#000" x="-70" y="-70" width="390" height="390"/>
+  <rect fill="url(#grad1)" stroke="#000" x="-70" y="-70" width="390" height="390" opacity="1"/>
   <g opacity="0.8">
     <rect x="25" y="25" width="200" height="200" fill="url(#grad2)" stroke-width="1" stroke="white" />
   </g>

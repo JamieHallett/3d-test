@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
-    <title>replit</title>
+    <title>Square Test 3d edition</title>
     <link href="style.css" rel="stylesheet" type="text/css" />
     <script
       src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"
@@ -15,16 +15,37 @@
   </head>
 
   <body>
-    Hello world
-    <a href="https://github.com/JamieHallett/3d-test?tab=readme-ov-file#readme" target="_blank">Help and controls</a>
+    <div id="titles">
+      Welcome to 3d test
+      <a
+        href="https://github.com/JamieHallett/3d-test?tab=readme-ov-file#readme"
+        target="_blank"
+        >Help and controls</a
+      >
+      <span
+        >Enable Fullscreen:<input
+          type="checkbox"
+          id="enableFullscreen"
+          checked
+        />
+      </span>
+    </div>
+
     <!--
     <button onclick="button()">button</button>
     <button onclick="button2()">button two</button>
     -->
-    
+
     <div id="canvascontainer">
-      <span id="frametimecontainer" style="background-color: #dfdfdf; position: fixed;">
-        <span id="frametime"></span>, <span id="projecCount"></span> projectiles
+      <span
+        id="frametimecontainer"
+        style="background-color: #dfdfdf; position: fixed; display: inline"
+      >
+        <pre id="frametime" style="display: inline"></pre>
+        ¦
+        <pre id="projecCount" style="display: inline"></pre>
+        projectiles ¦
+        <pre id="loopfreq" style="display: inline"></pre>
       </span>
       <canvas id="canvas" width="1920" height="1080"></canvas>
     </div>
